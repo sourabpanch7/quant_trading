@@ -22,6 +22,3 @@ ipykernel==6.29.4
 
 tsfresh==0.20.2
 arch==7.0.0
-
-pyarrow==16.1.0
-fastparquet==2024.5.0

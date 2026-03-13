@@ -148,4 +148,5 @@ __marimo__/
 resources/anonymized_data
 resources/config
 .idea
+mlruns
 notebooks/data-cleaning-feature-engineering-ipynb.ipynb

@@ -18,7 +18,7 @@ class CorrelationCalculation:
         self.optimal_lag = None
         self.leaders = None
         self.followers = None
-        self.pairs_df = None
+        self.pairs_df = pd.DataFrame()
 
     def create_pivoted_data(self):
         self.df = self.df.sort_values(["stock_id", "Date"])
@@ -81,15 +81,12 @@ class CorrelationCalculation:
                 if i != j:
                     corr = self.opt_matrix.loc[i, j]
 
-                    if corr > self.threshold:
+                    if corr < self.threshold:
                         pairs.append((i, j, corr))
 
-        pairs_df = pd.DataFrame(
-            pairs,
-            columns=["Leader", "Follower", "LagCorr"]
-        )
-
-        self.pairs_df = pairs_df.sort_values("LagCorr", ascending=False)
+        self.pairs_df = pd.DataFrame(pairs, columns=["Leader", "Follower", "LagCorr"])
+        logging.info(self.pairs_df)
+        self.pairs_df = self.pairs_df.sort_values("LagCorr", ascending=True)
 
     def plot_lag_score(self):
         lags = list(self.lag_scores.keys())
@@ -142,3 +139,4 @@ class CorrelationCalculation:
         self.plot_leader_scores()
         self.get_followers()
         self.plot_follower_scores()
+        self.get_strong_leader_followers_pairs()

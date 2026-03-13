@@ -33,7 +33,7 @@ if __name__ == "__main__":
         dataset = mlflow.data.from_pandas(
             pred_df,
             source="resources/outputs/outputs/y_pred_test.csv",
-            name="stock_trends"
+            name="predictions"
         )
 
         run_timestamp = create_or_set_experiment()

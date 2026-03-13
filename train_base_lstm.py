@@ -1,6 +1,7 @@
 import logging
 import torch
 import numpy as np
+import pandas as pd
 import joblib
 import mlflow.pytorch
 from mlflow.data.numpy_dataset import from_numpy
@@ -10,6 +11,7 @@ from sklearn.model_selection import TimeSeriesSplit
 from src.data.dataset import StockDataset
 from src.model.lstm_model import StockPriceModel
 from src.model.early_stopping import EarlyStopping
+from src.model.mlflow_pyfunc import LSTMPyFuncModel
 from src.utils.utility import read_full_data, create_or_set_experiment, get_device
 
 if __name__ == "__main__":
@@ -157,11 +159,38 @@ if __name__ == "__main__":
                     logging.info("Early stopping triggered")
                     break
 
-            mlflow.pytorch.log_model(
-                model,
-                artifact_path="lstm_model"
+            pyfunc_model = LSTMPyFuncModel(
+                model=model,
+                seq_length=30,
+                n_features=X_train.shape[1],
+                device=device
             )
+
+            seq_length = 30
+            n_features = X_train.shape[1]
+
+            input_example_array = np.random.randn(1, seq_length * n_features)
+
+            columns = [
+                f"f_{t}_{f}"
+                for t in range(seq_length)
+                for f in range(n_features)
+            ]
+
+            input_example = pd.DataFrame(
+                input_example_array,
+                columns=columns
+            )
+
+            mlflow.pyfunc.log_model(
+                artifact_path="stock_price_model",
+                python_model=pyfunc_model,
+                registered_model_name="Stock_Price_Model",
+                input_example=input_example
+            )
+
             mlflow.log_artifact("resources/outputs/artifacts/scaler.pkl")
+            mlflow.log_dict(features.columns, "resources/outputs/artifacts/feature_names.json")
 
             numpy_dataset_train = from_numpy(features=X_train, targets=y_train, name="train_data")
             numpy_dataset_test = from_numpy(features=X_test, targets=y_test, name="test_data")

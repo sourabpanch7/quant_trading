@@ -7,13 +7,15 @@ def sharpe_ratio(returns):
 
 
 def max_drawdown(portfolio):
-    peak = np.maximum.accumulate(portfolio)
-    drawdown = (portfolio - peak) / peak
+    rolling_max = portfolio.cummax()
+    drawdown = portfolio / rolling_max - 1
     return drawdown.min()
 
 
 def turnover(signals):
-    return np.sum(np.abs(np.diff(signals)))
+    position_change = signals.diff().abs()
+    turnover = position_change.sum() / len(signals)
+    return turnover
 
 
 def calculate_spread(x, y):

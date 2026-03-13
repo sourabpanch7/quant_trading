@@ -53,7 +53,7 @@ def read_config(file_path):
     return cnf
 
 
-def create_or_set_experiment(exp_name="quant_algo_trading_new"):
+def create_or_set_experiment(exp_name="quant_algo_trading"):
     mlflow.set_tracking_uri("http://127.0.0.1:5000")
     mlflow.set_experiment(experiment_name=exp_name)
     run_timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")

@@ -1,24 +1,17 @@
 import logging
-from datetime import datetime
-import pandas as pd
-from concurrent.futures import ProcessPoolExecutor
 import mlflow
-from src.data.load_data import load_data
-from src.utils.utility import get_file_names
 from src.eda.correlation_analysis import CorrelationCalculation
+from src.utils.utility import read_full_data, create_or_set_experiment
 
 if __name__ == "__main__":
     logging.getLogger().setLevel(level=logging.INFO)
     try:
-        files = get_file_names('resources/anonymized_data')
-        with ProcessPoolExecutor(max_workers=3) as executor:
-            df_list = list(executor.map(load_data, files))
 
-        combined_df = pd.concat(df_list, ignore_index=True)
+        combined_df = read_full_data()
 
         correlation_obj = CorrelationCalculation(df=combined_df,
                                                  img_path=r'/Users/sourabpanchanan/PycharmProjects/quant_trading/resources/outputs/eda_plots',
-                                                 threshold=-0.16)
+                                                 threshold=0.16)
 
         correlation_obj.perform_eda()
 
@@ -43,14 +36,11 @@ if __name__ == "__main__":
 
         if not correlation_obj.pairs_df.empty:
             correlation_obj.pairs_df.to_csv(
-                "resources/outputs/analysis_outputs/leader_follower_pairs.csv",
+                "resources/outputs/outputs/leader_follower_pairs.csv",
                 index=False)
             is_pairs_df_empty = False
 
-        run_timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
-
-        mlflow.set_tracking_uri("http://127.0.0.1:5000")
-        mlflow.set_experiment("quant_algo_trading_new")
+        run_timestamp = create_or_set_experiment()
 
         with mlflow.start_run(run_name=f"eda_{run_timestamp}"):
 
@@ -69,10 +59,10 @@ if __name__ == "__main__":
             mlflow.log_artifact("resources/outputs/eda_plots/leaders_visualisation.png")
             # log dataset outputs
             if not is_pairs_df_empty:
-                mlflow.log_artifact("resources/outputs/analysis_outputs/leader_follower_pairs.csv")
+                mlflow.log_artifact("resources/outputs/outputs/leader_follower_pairs.csv")
 
     except Exception as err_msg:
         logging.error(str(err_msg))
         raise err_msg
     finally:
-        logging.info("DONE")
+        logging.info("EDA DONE")

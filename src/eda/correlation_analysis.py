@@ -81,7 +81,7 @@ class CorrelationCalculation:
                 if i != j:
                     corr = self.opt_matrix.loc[i, j]
 
-                    if corr < self.threshold:
+                    if np.abs(corr) > self.threshold:
                         pairs.append((i, j, corr))
 
         self.pairs_df = pd.DataFrame(pairs, columns=["Leader", "Follower", "LagCorr"])

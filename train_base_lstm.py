@@ -19,6 +19,7 @@ if __name__ == "__main__":
     try:
 
         combined_df = read_full_data()
+
         combined_df["target"] = combined_df.groupby("stock_id")["Close"].shift(-1) / combined_df["Close"] - 1
 
         combined_df = combined_df.dropna()

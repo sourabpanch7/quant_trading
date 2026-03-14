@@ -1,4 +1,5 @@
 import os
+import logging
 import json
 from datetime import datetime
 import pandas as pd
@@ -11,7 +12,7 @@ import torch
 
 def get_device():
     if torch.backends.mps.is_available():
-        print("Using Apple Metal GPU (MPS)")
+        logging.info("Using Apple Metal GPU (MPS)")
         return torch.device("mps")
 
     else:

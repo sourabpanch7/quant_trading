@@ -94,7 +94,7 @@ if __name__ == "__main__":
         model_name = "Stock_Price_Model"
         model_version = "latest"
 
-        model_uri = client.get_model_version_download_uri(name=model_name, version='3')
+        model_uri = client.get_model_version_download_uri(name=model_name, version='4')
         pyfunc_model = mlflow.pyfunc.load_model(model_uri)
 
         predictions = run_inference(

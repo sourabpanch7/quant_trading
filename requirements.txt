@@ -13,7 +13,7 @@ torchvision==0.18.0
 
 mlflow==3.10.1
 
-pykalman==0.9.5
+pykalman==0.11.2
 
 tqdm==4.66.4
 

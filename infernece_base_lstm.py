@@ -1,4 +1,6 @@
+import os
 import logging
+import torch
 import mlflow
 from mlflow.tracking import MlflowClient
 import numpy as np
@@ -43,7 +45,6 @@ def run_inference(X_test, model_uri, seq_length=30):
     # Convert to dataframe for pyfunc
     input_df = prepare_pyfunc_input(X_seq)
 
-    # print(input_df)
     # Predict
     preds = model.predict(input_df)
 
@@ -80,10 +81,15 @@ def create_evaluation_dataframe(predictions, y_test_sequences):
 
 
 if __name__ == "__main__":
+    np.random.seed(42)
     logging.getLogger().setLevel(level=logging.INFO)
+    torch.mps.empty_cache()
     try:
-        X_test = np.load("resources/outputs/datasets/X_test.npy")
-        y_test = np.load("resources/outputs/datasets/y_test.npy")
+        X_test_load = np.load("resources/outputs/datasets/X_test.npy")
+        y_test_load = np.load("resources/outputs/datasets/y_test.npy")
+        X_test = X_test_load.astype(np.float16)
+        y_test = y_test_load.astype(np.float16)
+
         seq_length = 30
 
         y_test_sequences = create_label_sequnce(y_test, seq_length)
@@ -92,9 +98,11 @@ if __name__ == "__main__":
         client = MlflowClient()
 
         model_name = "Stock_Price_Model"
-        model_version = "latest"
 
-        model_uri = client.get_model_version_download_uri(name=model_name, version='4')
+        model_metadata = client.get_latest_versions(model_name)
+        latest_model_version = model_metadata[0].version
+
+        model_uri = client.get_model_version_download_uri(name=model_name, version=latest_model_version)
         pyfunc_model = mlflow.pyfunc.load_model(model_uri)
 
         predictions = run_inference(

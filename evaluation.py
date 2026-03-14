@@ -1,11 +1,13 @@
 import logging
 import mlflow
 import pandas as pd
+import numpy as np
 from sklearn.metrics import mean_squared_error
 from src.evaluation.metrics import sharpe_ratio, max_drawdown, turnover
 from src.utils.utility import create_or_set_experiment
 
 if __name__ == "__main__":
+    np.random.seed(42)
     logging.getLogger().setLevel(level=logging.INFO)
     try:
         pred_df = pd.read_csv('resources/outputs/outputs/y_pred_test.csv')

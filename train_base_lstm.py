@@ -15,6 +15,7 @@ from src.model.mlflow_pyfunc import LSTMPyFuncModel
 from src.utils.utility import read_full_data, create_or_set_experiment, get_device
 
 if __name__ == "__main__":
+    np.random.seed(42)
     logging.getLogger().setLevel(level=logging.INFO)
     try:
 
@@ -56,6 +57,10 @@ if __name__ == "__main__":
         X_val = scaler.transform(X_val)
 
         X_test = scaler.transform(X_test)
+
+
+        np.save(f'resources/outputs/datasets/X_test.npy',X_test)
+        np.save(f'resources/outputs/datasets/y_test.npy', y_test)
 
         joblib.dump(scaler, "resources/outputs/artifacts/scaler.pkl")
 
@@ -163,8 +168,7 @@ if __name__ == "__main__":
             pyfunc_model = LSTMPyFuncModel(
                 model=model,
                 seq_length=30,
-                n_features=X_train.shape[1],
-                device=device
+                n_features=X_train.shape[1]
             )
 
             seq_length = 30
@@ -191,7 +195,7 @@ if __name__ == "__main__":
             )
 
             mlflow.log_artifact("resources/outputs/artifacts/scaler.pkl")
-            mlflow.log_dict(features.columns, "resources/outputs/artifacts/feature_names.json")
+            mlflow.log_dict(features.columns.tolist(), "feature_names.json")
 
             numpy_dataset_train = from_numpy(features=X_train, targets=y_train, name="train_data")
             numpy_dataset_test = from_numpy(features=X_test, targets=y_test, name="test_data")

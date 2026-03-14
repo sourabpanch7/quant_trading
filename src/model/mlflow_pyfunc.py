@@ -1,15 +1,18 @@
 import mlflow.pyfunc
 import torch
 import numpy as np
+from src.utils.utility import get_device
+
+np.random.seed(42)
 
 
 class LSTMPyFuncModel(mlflow.pyfunc.PythonModel):
 
-    def __init__(self, model, seq_length, n_features, device):
-        self.model = model
+    def __init__(self, model, seq_length, n_features):
+        self.model = model.half()
         self.seq_length = seq_length
         self.n_features = n_features
-        self.device = device
+        self.device = get_device()
 
     def predict(self, context, model_input):
         # Convert dataframe to numpy
@@ -20,7 +23,7 @@ class LSTMPyFuncModel(mlflow.pyfunc.PythonModel):
 
         X_tensor = torch.tensor(
             X,
-            dtype=torch.float32
+            dtype=torch.float16
         ).to(self.device)
 
         self.model.eval()

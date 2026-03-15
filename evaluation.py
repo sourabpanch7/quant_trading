@@ -2,9 +2,29 @@ import logging
 import mlflow
 import pandas as pd
 import numpy as np
-from sklearn.metrics import mean_squared_error
-from src.evaluation.metrics import sharpe_ratio, max_drawdown, turnover
+from sklearn.metrics import mean_squared_error, r2_score, root_mean_squared_error
 from src.utils.utility import create_or_set_experiment
+from src.evaluation.metrics import sharpe_ratio, max_drawdown, turnover
+
+
+def calculate_metrics(df):
+    metrics = {}
+    mse = mean_squared_error(df['true_return'], df['pred_return'])
+    metrics['mse'] = mse
+    rmse = root_mean_squared_error(df['true_return'], df['pred_return'])
+    metrics['rmse'] = rmse
+    r2 = r2_score(df['true_return'], df['pred_return'])
+    metrics['r2'] = r2
+    sharperatio = sharpe_ratio(df["strategy_return"])
+    metrics['sharpe_ratio'] = sharperatio
+
+    maxdrawdown = max_drawdown(df["equity_curve"])
+    metrics['max_drawdown'] = maxdrawdown
+
+    turn_over = turnover(df["signal"])
+    metrics['turnover'] = turn_over
+    return metrics
+
 
 if __name__ == "__main__":
     np.random.seed(42)
@@ -16,28 +36,12 @@ if __name__ == "__main__":
 
         logging.info(pred_df["signal"].diff().abs().sum())
 
-        mse = mean_squared_error(pred_df['true_return'], pred_df['pred_return'])
-
-        metrics = {}
-        metrics['mse'] = mse
-
-        sharpe_ratio = sharpe_ratio(pred_df["strategy_return"])
-        metrics['sharpe_ratio'] = sharpe_ratio
-
-        max_drawdown = max_drawdown(pred_df["equity_curve"])
-        metrics['max_drawdown'] = max_drawdown
-
-        turnover = turnover(pred_df["signal"])
-        metrics['turnover'] = turnover
-
-        logging.info(metrics)
-
         dataset = mlflow.data.from_pandas(
             pred_df,
             source="resources/outputs/outputs/y_pred_test.csv",
             name="predictions"
         )
-
+        metrics = calculate_metrics(pred_df)
         run_timestamp = create_or_set_experiment()
 
         with mlflow.start_run(run_name=f"evaluation_{run_timestamp}"):

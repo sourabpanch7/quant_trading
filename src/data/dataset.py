@@ -18,3 +18,22 @@ class StockDataset(Dataset):
 
         return torch.tensor(X_seq, dtype=torch.float32), \
             torch.tensor(y_val, dtype=torch.float32)
+
+
+class StockGNNDataset(Dataset):
+
+    def __init__(self, X_seq, y_seq, stock_ids):
+        self.X = torch.tensor(X_seq, dtype=torch.float32)
+        self.y = torch.tensor(y_seq, dtype=torch.float32)
+        stock_ids = [int(stock_id) for stock_id in stock_ids]
+        self.stock_ids = torch.tensor(stock_ids, dtype=torch.long)
+
+    def __len__(self):
+        return len(self.X)
+
+    def __getitem__(self, idx):
+        return (
+            self.X[idx],
+            self.stock_ids[idx],
+            self.y[idx]
+        )

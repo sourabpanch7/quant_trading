@@ -20,7 +20,6 @@ def get_device():
         return torch.device("cpu")
 
 
-
 def get_file_names(directory_path):
     for entry in os.listdir(directory_path):
         full_path = os.path.join(directory_path, entry)
@@ -59,3 +58,20 @@ def create_or_set_experiment(exp_name="quant_algo_trading"):
     mlflow.set_experiment(experiment_name=exp_name)
     run_timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
     return run_timestamp
+
+
+def create_gnn_sequences(X, y, stock_ids, seq_length):
+    X_seq = []
+    y_seq = []
+    stock_seq = []
+
+    for i in range(len(X) - seq_length):
+        X_seq.append(X[i:i + seq_length])
+        y_seq.append(y[i + seq_length])
+        stock_seq.append(stock_ids[i + seq_length])
+
+    return (
+        np.array(X_seq),
+        np.array(y_seq),
+        np.array(stock_seq)
+    )

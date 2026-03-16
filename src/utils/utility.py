@@ -60,18 +60,35 @@ def create_or_set_experiment(exp_name="quant_algo_trading"):
     return run_timestamp
 
 
-def create_gnn_sequences(X, y, stock_ids, seq_length):
+def create_gnn_sequences(df, feature_cols, seq_length, scaler):
     X_seq = []
-    y_seq = []
     stock_seq = []
+    y_seq = []
+    date_seq = []
+    price_seq = []
 
-    for i in range(len(X) - seq_length):
-        X_seq.append(X[i:i + seq_length])
-        y_seq.append(y[i + seq_length])
-        stock_seq.append(stock_ids[i + seq_length])
+    for stock_id, group in df.groupby("stock_id"):
+
+        group = group.sort_values("Date")
+
+        X = group[feature_cols]
+        X = scaler.transform(X)
+        # X = X.values
+        y = group["target"].values
+        dates = group["Date"].values
+        prices = group["Close"].values
+
+        for i in range(len(group) - seq_length):
+            X_seq.append(X[i:i + seq_length])
+            stock_seq.append(stock_id)
+            y_seq.append(y[i + seq_length])
+            date_seq.append(dates[i + seq_length])
+            price_seq.append(prices[i + seq_length])
 
     return (
         np.array(X_seq),
+        np.array(stock_seq),
         np.array(y_seq),
-        np.array(stock_seq)
+        np.array(date_seq),
+        np.array(price_seq)
     )

@@ -42,25 +42,20 @@ class LSTMGNNPyFuncModel(mlflow.pyfunc.PythonModel):
         self.edge_index = torch.load(
             context.artifacts["edge_index"]
         ).to(self.device)
-        checkpoint = torch.load(context.artifacts["model_path"],map_location=self.device)
-        input_size = checkpoint["input_size"]
-        hidden_dim = checkpoint["hidden_dim"]
-        num_stocks = checkpoint["num_stocks"]
-        self.model = StockPriceHybridModel(input_size,hidden_dim,num_stocks).to
-        self.model = self.model.half()
+        checkpoint = torch.load(context.artifacts["model_path"], map_location=self.device)
+        input_size = checkpoint.get("input_size", 17)
+        hidden_dim = checkpoint.get("hidden_dim", 64)
+        self.model = StockPriceHybridModel(input_size, hidden_dim).half().to(self.device)
         self.model.eval()
 
-
     def predict(self, context, model_input):
-
-        X = model_input["X"]
+        X = np.stack(model_input["sequence"].values)
         stock_ids = model_input["stock_id"]
 
-        X = torch.tensor(X, dtype=torch.float16)
-        stock_ids = torch.tensor(stock_ids)
+        X = torch.tensor(X, dtype=torch.float16).to(self.device)
+        stock_ids = torch.tensor(stock_ids).to(self.device)
 
         with torch.no_grad():
-
             preds = self.model(
                 X,
                 stock_ids,

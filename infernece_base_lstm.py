@@ -1,56 +1,51 @@
-import os
 import logging
+import joblib
 from mlflow.tracking import MlflowClient
 import numpy as np
 import pandas as pd
 import mlflow
-import torch
-
-
-def create_sequences(X, stock_ids, seq_length):
-    X_seq = []
-    stock_seq = []
-
-    for i in range(len(X) - seq_length):
-        X_seq.append(X[i:i + seq_length])
-        stock_seq.append(stock_ids[i + seq_length])
-
-    return np.array(X_seq), np.array(stock_seq)
-
-
-def load_pyfunc_model(model_uri):
-    model = mlflow.pyfunc.load_model(model_uri)
-    return model
+from src.utils.utility import create_gnn_sequences
 
 
 def prepare_inference_dataframe(X_seq, stock_seq):
-    df = pd.DataFrame({
+    return pd.DataFrame({
         "sequence": [x.tolist() for x in X_seq],
         "stock_id": stock_seq.astype(int)
     })
-    return df
 
 
-def run_inference(X_test, stock_ids, model, seq_length=30):
-    # Create sequences
-    X_seq, stock_seq = create_sequences(
-        X_test,
-        stock_ids,
-        seq_length
+def run_inference(df, feature_cols, seq_length, model, scaler):
+    df = df.sort_values(["stock_id", "Date"]).reset_index(drop=True)
+
+    X_seq, stock_seq, y_seq, dates, prices = create_gnn_sequences(
+        df,
+        feature_cols,
+        seq_length, scaler
     )
 
-    # Prepare dataframe for pyfunc model
-    inference_df = prepare_inference_dataframe(
-        X_seq,
-        stock_seq
-    )
+    inference_df = prepare_inference_dataframe(X_seq, stock_seq)
 
-    # Load MLflow model
-
-    # Predict
     preds = model.predict(inference_df)
 
-    return preds, X_seq, stock_seq
+    preds = preds.flatten()
+
+    pred_df = pd.DataFrame({
+        "Date": dates,
+        "stock_id": stock_seq,
+        "Close": prices,
+        "actual_return": y_seq,
+        "predicted_return": preds
+    })
+
+    pred_df["signal"] = np.sign(pred_df["predicted_return"])
+    pred_df["strategy_return"] = pred_df["signal"] * pred_df["actual_return"]
+    pred_df = pred_df.sort_values(["stock_id", "Date"])
+
+    return pred_df
+
+
+def save_predictions(pred_df, preds_path):
+    pred_df.to_csv(preds_path, index=False)
 
 
 if __name__ == "__main__":
@@ -59,6 +54,8 @@ if __name__ == "__main__":
 
     mlflow.set_tracking_uri("http://127.0.0.1:5000")
     client = MlflowClient()
+    SEQ_LENGTH = 30
+    PRED_PATH = 'resources/outputs/outputs/pred_test.csv'
     try:
         model_name = "Stock_Price_GNN_Model"
 
@@ -68,20 +65,14 @@ if __name__ == "__main__":
         model_uri = client.get_model_version_download_uri(name=model_name, version=latest_model_version)
         pyfunc_model = mlflow.pyfunc.load_model(model_uri)
 
-        # Example loading test data
+        scaler = joblib.load('resources/outputs/artifacts/scaler.pkl')
         test_data = pd.read_csv('resources/outputs/outputs/data_complete.csv')
-        test_data = test_data[test_data["stock_id"].isin('003', '032', '049', '068', '071')]
         stock_ids = test_data["stock_id"].astype(int).unique().tolist()
-        X_test = test_data.drop(columns=["target", "Date", "stock_id"])
+        feature_cols = [col for col in test_data.columns if col not in ("target", "Date", "stock_id")]
 
-        # Run inference
-        predictions, X_seq, stock_seq = run_inference(
-            X_test,
-            stock_ids,
-            pyfunc_model,
-            seq_length=30
-        )
-        print(predictions)
+        pred_df = run_inference(test_data, feature_cols, SEQ_LENGTH, pyfunc_model, scaler)
+
+        save_predictions(pred_df, PRED_PATH)
     except Exception as err_msg:
         logging.error(str(err_msg))
         raise err_msg

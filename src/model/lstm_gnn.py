@@ -3,7 +3,7 @@ import torch.nn as nn
 from torch_geometric.nn import GCNConv
 
 
-class StockPriceHybridModel(nn.Module):
+class StockPriceHybridModelOld(nn.Module):
 
     def __init__(
             self,
@@ -36,3 +36,32 @@ class StockPriceHybridModel(nn.Module):
         out = self.fc(node_features)
 
         return out.squeeze()
+
+
+class StockPriceHybridModel(nn.Module):
+
+    def __init__(self, input_size, hidden_dim=64):
+
+        super().__init__()
+
+        self.lstm = nn.LSTM(
+            input_size,
+            hidden_dim,
+            batch_first=True
+        )
+
+        self.gcn = GCNConv(hidden_dim, hidden_dim)
+
+        self.fc = nn.Linear(hidden_dim, 1)
+
+    def forward(self, x, stock_ids, edge_index):
+
+        lstm_out, _ = self.lstm(x)
+
+        temporal_emb = lstm_out[:, -1, :]
+
+        gnn_out = self.gcn(temporal_emb, edge_index)
+
+        node_features = gnn_out[stock_ids]
+
+        return self.fc(node_features).squeeze()

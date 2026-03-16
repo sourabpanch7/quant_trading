@@ -2,51 +2,52 @@ import logging
 import mlflow
 import pandas as pd
 import numpy as np
-from sklearn.metrics import mean_squared_error, r2_score, root_mean_squared_error
 from src.utils.utility import create_or_set_experiment
-from src.evaluation.metrics import sharpe_ratio, max_drawdown, turnover
+from src.evaluation.metrics import calculate_sharpe_ratio, calculate_drawdown, run_portfolio_backtest, calculate_spread
+from src.evaluation.stat_arb import run_stat_arb_strategy, find_stat_arb_pairs
 
 
 def calculate_metrics(df):
-    metrics = {}
-    mse = mean_squared_error(df['true_return'], df['pred_return'])
-    metrics['mse'] = mse
-    rmse = root_mean_squared_error(df['true_return'], df['pred_return'])
-    metrics['rmse'] = rmse
-    r2 = r2_score(df['true_return'], df['pred_return'])
-    metrics['r2'] = r2
-    sharperatio = sharpe_ratio(df["strategy_return"])
-    metrics['sharpe_ratio'] = sharperatio
+    daily_returns, turnover = run_portfolio_backtest(df)
+    sharpe = calculate_sharpe_ratio(daily_returns)
+    max_dd, avg_dd = calculate_drawdown(daily_returns)
+    pairs = find_stat_arb_pairs(df, 0.5)
+    metrics = {"sharpe_ratio": sharpe, "max_drawdown": max_dd, "average_drawdown": avg_dd}
+    spreads = []
+    for pair in pairs:
+        spread = calculate_spread(pred_df, pair[0], pair[1])
+        spreads.append(spread)
 
-    maxdrawdown = max_drawdown(df["equity_curve"])
-    metrics['max_drawdown'] = maxdrawdown
-
-    turn_over = turnover(df["signal"])
-    metrics['turnover'] = turn_over
-    return metrics
+    spread_df = pd.concat(spreads)
+    fin_df = run_stat_arb_strategy(spread_df)
+    return metrics, fin_df
 
 
 if __name__ == "__main__":
     np.random.seed(42)
     logging.getLogger().setLevel(level=logging.INFO)
     try:
-        pred_df = pd.read_csv('resources/outputs/outputs/y_pred_test.csv')
-        logging.info(pred_df["pred_return"].describe())
-        logging.info(pred_df["signal"].value_counts())
-
-        logging.info(pred_df["signal"].diff().abs().sum())
+        pred_df = pd.read_csv('resources/outputs/outputs/pred_test.csv')
 
         dataset = mlflow.data.from_pandas(
             pred_df,
-            source="resources/outputs/outputs/y_pred_test.csv",
+            source="resources/outputs/outputs/pred_test.csv",
             name="predictions"
         )
-        metrics = calculate_metrics(pred_df)
+        metrics, fin_df = calculate_metrics(pred_df)
+        strategy_fin_df = fin_df[fin_df['strategy_return'] > 0]
+        strategy_fin_df["stock_a"] = strategy_fin_df["stock_a"].astype(str).str.zfill(3)
+        strategy_fin_df["stock_b"] = strategy_fin_df["stock_b"].astype(str).str.zfill(3)
+        pair_dict = strategy_fin_df[["stock_a", "stock_b"]].drop_duplicates().to_dict(orient='records')[0]
+        metrics = {**metrics, **pair_dict}
         run_timestamp = create_or_set_experiment()
-
         with mlflow.start_run(run_name=f"evaluation_{run_timestamp}"):
             mlflow.log_metrics(metrics)
             mlflow.log_input(dataset, context="evaluation")
+            mlflow.log_table(
+                data=strategy_fin_df,
+                artifact_file="positive_strategy_return.json"  # Name of the artifact file
+            )
 
     except Exception as err_msg:
         logging.error(str(err_msg))

@@ -71,32 +71,21 @@ if __name__ == "__main__":
                 df_train = combined_df.iloc[train_idx]
                 df_val = combined_df.iloc[val_idx]
 
-                stock_train_raw = df_train['stock_id'].values
-                stock_val_raw = df_val['stock_id'].values
-
-                X_train_raw = df_train[feature_columns].values
-                y_train_raw = df_train["target"].values
-
-                X_train = scaler.fit_transform(X_train_raw)
-
-                X_val_raw = df_val[feature_columns].values
-                y_val_raw = df_val["target"].values
-
-                X_val = scaler.transform(X_val_raw)
+                scaler.fit(df_train[feature_columns])
 
                 # Create sequences AFTER splitting
-                X_train_seq, y_train_seq, stock_train_seq = create_gnn_sequences(
-                    X_train_raw,
-                    y_train_raw,
-                    stock_train_raw,
-                    seq_length
+                X_train_seq, stock_train_seq, y_train_seq, train_dates, train_prices = create_gnn_sequences(
+                    df_train,
+                    feature_columns,
+                    seq_length,
+                    scaler
                 )
 
-                X_val_seq, y_val_seq, stock_val_seq = create_gnn_sequences(
-                    X_val_raw,
-                    y_val_raw,
-                    stock_val_raw,
-                    seq_length
+                X_val_seq, stock_val_seq, y_val_seq, val_dates, val_prices = create_gnn_sequences(
+                    df_val,
+                    feature_columns,
+                    seq_length,
+                    scaler
                 )
 
                 train_dataset = StockGNNDataset(
@@ -128,13 +117,11 @@ if __name__ == "__main__":
 
                 joblib.dump(scaler, "resources/outputs/artifacts/scaler.pkl")
 
-                input_dim = X_train.shape[1]
-
                 input_size = len(feature_columns)
 
                 model = StockPriceHybridModel(
                     input_size=input_size,
-                    hidden_size=64
+                    hidden_dim=64
                 )
                 model.to(device)
 

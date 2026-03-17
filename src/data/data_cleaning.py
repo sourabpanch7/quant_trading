@@ -72,6 +72,8 @@ def add_features(df):
 
     df["volume_ratio"] = df["Volume"] / df["volume_ma10"]
 
+    df["target"] = df.groupby("stock_id")["Close"].shift(-1) / df["Close"] - 1
+
     df = df.dropna().reset_index(drop=True)
 
     return df

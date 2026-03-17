@@ -19,9 +19,9 @@ if __name__ == "__main__":
     logging.getLogger().setLevel(level=logging.INFO)
     try:
 
-        combined_df = read_full_data()
+        combined_df = pd.read_csv("resources/inputs/engineered_data.csv")
 
-        combined_df["target"] = combined_df.groupby("stock_id")["Close"].shift(-1) / combined_df["Close"] - 1
+        # combined_df["target"] = combined_df.groupby("stock_id")["Close"].shift(-1) / combined_df["Close"] - 1
 
         combined_df = combined_df.dropna()
 
@@ -45,7 +45,7 @@ if __name__ == "__main__":
 
         seq_length = 30
 
-        scaler = StandardScaler()
+        scaler = joblib.load('resources/outputs/artifacts/scaler.pkl')
 
         run_timestamp = create_or_set_experiment()
 
@@ -114,8 +114,6 @@ if __name__ == "__main__":
                     batch_size=128,
                     shuffle=False
                 )
-
-                joblib.dump(scaler, "resources/outputs/artifacts/scaler.pkl")
 
                 input_size = len(feature_columns)
 

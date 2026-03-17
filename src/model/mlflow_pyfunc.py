@@ -43,7 +43,7 @@ class LSTMGNNPyFuncModel(mlflow.pyfunc.PythonModel):
             context.artifacts["edge_index"]
         ).to(self.device)
         checkpoint = torch.load(context.artifacts["model_path"], map_location=self.device)
-        input_size = checkpoint.get("input_size", 17)
+        input_size = checkpoint.get("input_size", 18)
         hidden_dim = checkpoint.get("hidden_dim", 64)
         self.model = StockPriceHybridModel(input_size, hidden_dim).half().to(self.device)
         self.model.eval()

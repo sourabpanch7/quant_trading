@@ -44,7 +44,7 @@ class ClusteringCalculation:
     def scale_features(self):
         self.scaler = StandardScaler()
         self.X = self.scaler.fit_transform(self.feature_df.drop(columns=["stock_id"]))
-        joblib.dump(self.scaler, f'{self.artifact_path}/scaler.pkl')
+
 
     def plot_elbow_silhouette(self):
         inertia = []

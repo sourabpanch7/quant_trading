@@ -12,14 +12,14 @@ from src.model.lstm_gnn import StockPriceHybridModel
 from src.model.early_stopping import EarlyStopping
 from src.model.mlflow_pyfunc import LSTMGNNPyFuncModel
 from src.model.graph_utils import build_stock_graph
-from src.utils.utility import read_full_data, create_or_set_experiment, get_device, create_gnn_sequences
+from src.utils.utility import read_config, create_or_set_experiment, get_device, create_gnn_sequences
 
 if __name__ == "__main__":
     np.random.seed(42)
     logging.getLogger().setLevel(level=logging.INFO)
     try:
-
-        combined_df = pd.read_csv("resources/inputs/engineered_data.csv")
+        config = read_config('resources/config/config.json')
+        combined_df = pd.read_csv(config["feature_engineered_data_path"])
 
         # combined_df["target"] = combined_df.groupby("stock_id")["Close"].shift(-1) / combined_df["Close"] - 1
 
@@ -27,7 +27,7 @@ if __name__ == "__main__":
 
         combined_df = combined_df.sort_values(by=['stock_id', 'Date']).reset_index(drop=True)
 
-        combined_df.to_csv('resources/outputs/outputs/data_complete.csv', index=False)
+        combined_df.to_csv(config["op_path"], index=False)
         features = combined_df.drop(columns=["target", "Date", "stock_id"])
         feature_columns = features.columns.tolist()
 
@@ -40,12 +40,12 @@ if __name__ == "__main__":
 
         edge_index = edge_index.to(device)
 
-        n_splits = 3
+        n_splits = config["n_splits"]
         tscv = TimeSeriesSplit(n_splits=n_splits)
 
-        seq_length = 30
+        seq_length = config["seq_length"]
 
-        scaler = joblib.load('resources/outputs/artifacts/scaler.pkl')
+        scaler = StandardScaler()
 
         run_timestamp = create_or_set_experiment()
 
@@ -55,23 +55,25 @@ if __name__ == "__main__":
                 "split_method": "TimeSeriesSplit",
                 "n_splits": n_splits,
                 "seq_length": seq_length,
-                # "batch_size": batch_size,
-                "hidden_dim": 64,
-                "num_layers": 2,
+                "batch_size": config["batch_size"],
+                "hidden_dim": config["hidden_dim"],
+                "num_layers": config["num_layers"],
                 "optimizer": "Adam",
-                "lr": 0.001,
-                "loss": "MSE",
+                "lr": config["learning_rate"],
+                "loss": "Huber",
                 "target": "1_day_forward_return",
-                "early_stopping_patience": 8,
-                "graph_threshold": 0.3
+                "early_stopping_patience": config["early_stopping_patience"],
+                "graph_threshold": config["graph_threshold"]
             })
             for fold, (train_idx, val_idx) in enumerate(tscv.split(features)):
-                logging.info(f"Training fold {fold}")
+                logging.info(f"Training fold {fold + 1}")
 
                 df_train = combined_df.iloc[train_idx]
                 df_val = combined_df.iloc[val_idx]
 
                 scaler.fit(df_train[feature_columns])
+
+                joblib.dump(scaler,config["scaler_path"])
 
                 # Create sequences AFTER splitting
                 X_train_seq, stock_train_seq, y_train_seq, train_dates, train_prices = create_gnn_sequences(
@@ -100,18 +102,15 @@ if __name__ == "__main__":
                     stock_val_seq
                 )
 
-                seq_length = 30
-                batch_size = 64
-
                 train_loader = DataLoader(
                     train_dataset,
-                    batch_size=128,
+                    batch_size=config["batch_size"],
                     shuffle=True
                 )
 
                 val_loader = DataLoader(
                     val_dataset,
-                    batch_size=128,
+                    batch_size=config["batch_size"],
                     shuffle=False
                 )
 
@@ -119,7 +118,7 @@ if __name__ == "__main__":
 
                 model = StockPriceHybridModel(
                     input_size=input_size,
-                    hidden_dim=64
+                    hidden_dim=config["hidden_dim"]
                 )
                 model.to(device)
 
@@ -129,12 +128,12 @@ if __name__ == "__main__":
 
                 optimizer = torch.optim.AdamW(
                     model.parameters(),
-                    lr=1e-3,
+                    lr=config["learning_rate"],
                     weight_decay=1e-5
                 )
 
-                epochs = 50
-                early_stopping = EarlyStopping(patience=8)
+                epochs = config.get("epochs", 50)
+                early_stopping = EarlyStopping(patience=config.get("early_stopping_patience", 8))
 
                 for epoch in range(epochs):
 
@@ -198,7 +197,7 @@ if __name__ == "__main__":
 
                     torch.save({"model_state_dict": model.state_dict()
                                    , "optimizer_state_dict": optimizer.state_dict()
-                                   , "val_loss": val_loss}, 'resources/outputs/models/stock_price_lst_gnn.pt')
+                                   , "val_loss": val_loss}, config["model_path"])
 
                     if early_stopping.stop:
                         logging.info("Early stopping triggered")
@@ -212,34 +211,20 @@ if __name__ == "__main__":
             }
             )
 
-            # mlflow.pyfunc.log_model(
-            #     artifact_path="stock_price_model",
-            #     python_model=pyfunc_model,
-            #     registered_model_name="Stock_Price_Model",
-            #     input_example=input_example
-            # )
-            torch.save(edge_index.cpu(), 'resources/outputs/artifacts/edge_index.pt')
+            torch.save(edge_index.cpu(), config["edge_index_op_path"])
             mlflow.pyfunc.log_model(
                 artifact_path="stock_price_gnn_model",
                 python_model=LSTMGNNPyFuncModel(),
                 registered_model_name="Stock_Price_GNN_Model",
-                # input_example=input_example,
+                input_example=input_example,
                 artifacts={
-                    "model_path": "resources/outputs/models/stock_price_lst_gnn.pt",
-                    "edge_index": "resources/outputs/artifacts/edge_index.pt"
+                    "model_path": config["model_path"],
+                    "edge_index": config["edge_index_op_path"]
                 }
             )
 
-            mlflow.log_artifact("resources/outputs/artifacts/scaler.pkl")
-            mlflow.log_dict(feature_columns, "feature_names.json")
-
-            # numpy_dataset_train = from_numpy(features=X_train, targets=y_train, name="train_data")
-            # numpy_dataset_test = from_numpy(features=X_test, targets=y_test, name="test_data")
-            # numpy_dataset_val = from_numpy(features=X_val, targets=y_val, name="val_data")
-
-            # mlflow.log_input(dataset=numpy_dataset_train, context="training")
-            # mlflow.log_input(dataset=numpy_dataset_test, context="test")
-            # mlflow.log_input(dataset=numpy_dataset_val, context="validation")
+            mlflow.log_artifact(config["scaler_path"])
+            mlflow.log_dict(feature_columns, config.get("feature_names_artifact_name", "feature_names.json"))
 
     except Exception as err_msg:
         logging.error(str(err_msg))

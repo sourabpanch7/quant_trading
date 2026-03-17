@@ -4,7 +4,7 @@ from mlflow.tracking import MlflowClient
 import numpy as np
 import pandas as pd
 import mlflow
-from src.utils.utility import create_gnn_sequences
+from src.utils.utility import create_gnn_sequences, read_config
 
 
 def prepare_inference_dataframe(X_seq, stock_seq):
@@ -52,12 +52,14 @@ if __name__ == "__main__":
     np.random.seed(42)
     logging.getLogger().setLevel(level=logging.INFO)
 
-    mlflow.set_tracking_uri("http://127.0.0.1:5000")
-    client = MlflowClient()
-    SEQ_LENGTH = 30
-    PRED_PATH = 'resources/outputs/outputs/pred_test.csv'
     try:
         model_name = "Stock_Price_GNN_Model"
+        config = read_config('resources/config/config.json')
+        SEQ_LENGTH = config.get("seq_length", 30)
+        PRED_PATH = config.get("predictions_path")
+
+        mlflow.set_tracking_uri(config["mlflow_uri"])
+        client = MlflowClient()
 
         model_metadata = client.get_latest_versions(model_name)
         latest_model_version = model_metadata[0].version
@@ -65,8 +67,8 @@ if __name__ == "__main__":
         model_uri = client.get_model_version_download_uri(name=model_name, version=latest_model_version)
         pyfunc_model = mlflow.pyfunc.load_model(model_uri)
 
-        scaler = joblib.load('resources/outputs/artifacts/scaler.pkl')
-        test_data = pd.read_csv('resources/outputs/outputs/data_complete.csv')
+        scaler = joblib.load(config["scaler_path"])
+        test_data = pd.read_csv(config["op_path"])
         stock_ids = test_data["stock_id"].astype(int).unique().tolist()
         feature_cols = [col for col in test_data.columns if col not in ("target", "Date", "stock_id")]
 

@@ -2,7 +2,7 @@ import logging
 import mlflow
 import pandas as pd
 import numpy as np
-from src.utils.utility import create_or_set_experiment, get_file_names
+from src.utils.utility import create_or_set_experiment, get_file_names, read_config
 from src.evaluation.metrics import calculate_sharpe_ratio, calculate_drawdown, run_portfolio_backtest, calculate_spread
 from src.evaluation.stat_arb import run_stat_arb_strategy, find_stat_arb_pairs
 from src.evaluation.visualisations import *
@@ -38,8 +38,11 @@ def calculate_metrics(df, fig_path='resources/outputs/evaluation_plots'):
 if __name__ == "__main__":
     np.random.seed(42)
     logging.getLogger().setLevel(level=logging.INFO)
-    FIGURE_PATH = 'resources/outputs/evaluation_plots'
+
     try:
+        config = read_config('resources/config/config.json')
+        FIGURE_PATH = 'resources/outputs/evaluation_plots'
+        config = read_config('resources/config/config.json')
         pred_df = pd.read_csv('resources/outputs/outputs/pred_test.csv')
 
         dataset = mlflow.data.from_pandas(

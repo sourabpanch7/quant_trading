@@ -5,13 +5,23 @@ import numpy as np
 from src.utils.utility import create_or_set_experiment
 from src.evaluation.metrics import calculate_sharpe_ratio, calculate_drawdown, run_portfolio_backtest, calculate_spread
 from src.evaluation.stat_arb import run_stat_arb_strategy, find_stat_arb_pairs
+from src.evaluation.visualisations import *
 
 
-def calculate_metrics(df):
+def calculate_metrics(df,fig_path ='resources/outputs/evaluation_plots'):
     daily_returns, turnover = run_portfolio_backtest(df)
     sharpe = calculate_sharpe_ratio(daily_returns)
     max_dd, avg_dd = calculate_drawdown(daily_returns)
     pairs = find_stat_arb_pairs(df, 0.5)
+    plot_equity_curve(daily_returns,f'{fig_path}/equity_curve.png')
+    plot_drawdown(daily_returns,f'{fig_path}/drawdown_curve.png')
+    plot_predictions_vs_actual(df,f'{fig_path}/prediction_vs_actual.png')
+    plot_prediction_distribution(df,f'{fig_path}/prediction_distribution.png')
+    plot_daily_return_distribution(df,f'{fig_path}/daily_returns_distribution.png')
+    plot_turnover(df,f'{fig_path}/turnover.png')
+    plot_ic(df,f'{fig_path}/information_coefficient.png')
+    plot_stock_correlation(df, f'{fig_path}/stock_correlation.png')
+
     metrics = {"sharpe_ratio": sharpe, "max_drawdown": max_dd, "average_drawdown": avg_dd}
     spreads = []
     for pair in pairs:
@@ -19,6 +29,8 @@ def calculate_metrics(df):
         spreads.append(spread)
 
     spread_df = pd.concat(spreads)
+    plot_spread(spread_df,f'{fig_path}/spread_viz.png')
+    plot_spread_zscore(spread_df,f'{fig_path}/spread_zscore_viz.png')
     fin_df = run_stat_arb_strategy(spread_df)
     return metrics, fin_df
 
@@ -26,6 +38,7 @@ def calculate_metrics(df):
 if __name__ == "__main__":
     np.random.seed(42)
     logging.getLogger().setLevel(level=logging.INFO)
+    FIGURE_PATH = 'resources/outputs/evaluation_plots'
     try:
         pred_df = pd.read_csv('resources/outputs/outputs/pred_test.csv')
 
@@ -34,7 +47,7 @@ if __name__ == "__main__":
             source="resources/outputs/outputs/pred_test.csv",
             name="predictions"
         )
-        metrics, fin_df = calculate_metrics(pred_df)
+        metrics, fin_df = calculate_metrics(pred_df,FIGURE_PATH)
         strategy_fin_df = fin_df[fin_df['strategy_return'] > 0]
         strategy_fin_df["stock_a"] = strategy_fin_df["stock_a"].astype(str).str.zfill(3)
         strategy_fin_df["stock_b"] = strategy_fin_df["stock_b"].astype(str).str.zfill(3)
@@ -48,6 +61,17 @@ if __name__ == "__main__":
                 data=strategy_fin_df,
                 artifact_file="positive_strategy_return.json"  # Name of the artifact file
             )
+            mlflow.log_artifact(f"{FIGURE_PATH}/equity_curve.png")
+            mlflow.log_artifact(f"{FIGURE_PATH}/drawdown_curve.png")
+            mlflow.log_artifact(f"{FIGURE_PATH}/prediction_vs_actual.png")
+            mlflow.log_artifact(f"{FIGURE_PATH}/prediction_distribution.png")
+            mlflow.log_artifact(f"{FIGURE_PATH}/daily_returns_distribution.png")
+            mlflow.log_artifact(f"{FIGURE_PATH}/turnover.png")
+            mlflow.log_artifact(f"{FIGURE_PATH}/information_coefficient.png")
+            mlflow.log_artifact(f"{FIGURE_PATH}/stock_correlation.png")
+            mlflow.log_artifact(f"{FIGURE_PATH}/spread_viz.png")
+            mlflow.log_artifact(f"{FIGURE_PATH}/spread_zscore_viz.png")
+
 
     except Exception as err_msg:
         logging.error(str(err_msg))
